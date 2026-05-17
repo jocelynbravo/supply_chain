@@ -1,0 +1,252 @@
+"""
+etl_pipeline.py  |  Supply Chain Data Ingestion & Cleaning
+=============================================================
+Generates synthetic supply chain data, loads it into SQLite,
+and applies cleaning rules before analysis.
+
+Usage:
+    python etl_pipeline.py --generate          # create synthetic data
+    python etl_pipeline.py --load data/        # load CSVs into DB
+    python etl_pipeline.py --generate --load . # do both
+"""
+
+import argparse
+import sqlite3
+import random
+import string
+from pathlib import Path
+from datetime import date, timedelta
+
+import numpy as np
+import pandas as pd
+
+# ──────────────────────────────────────────────
+# Config
+# ──────────────────────────────────────────────
+DB_PATH       = "supply_chain.db"
+DATA_DIR      = Path("data")
+N_SUPPLIERS   = 12
+N_SKUS        = 80
+N_ORDERS      = 3_000
+N_DEMAND_ROWS = 5_000
+SNAPSHOT_DAYS = 90
+SEED          = 42
+
+random.seed(SEED)
+np.random.seed(SEED)
+
+REGIONS     = ["North America", "EMEA", "APAC", "Latin America"]
+CATEGORIES  = ["Raw Material", "Packaging", "Component", "MRO", "Finished Good"]
+STATUSES    = ["received", "received", "received", "partial", "cancelled"]
+
+# ──────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────
+def rand_id(prefix: str, n: int = 6) -> str:
+    return prefix + "".join(random.choices(string.digits, k=n))
+
+def rand_date(start: date, end: date) -> date:
+    delta = (end - start).days
+    return start + timedelta(days=random.randint(0, delta))
+
+
+# ──────────────────────────────────────────────
+# Synthetic Data Generators
+# ──────────────────────────────────────────────
+def gen_suppliers(n: int) -> pd.DataFrame:
+    names = [
+        "Apex Industrial", "BlueSky Components", "CoreLink MFG",
+        "Delta Supplies", "Everest Parts", "Frontier Logistics",
+        "Global Parts Co.", "Horizon Materials", "Irongate Supply",
+        "JetStream Industrial", "Keystone Group", "Luminate Corp",
+    ]
+    rows = []
+    for i in range(n):
+        rows.append({
+            "supplier_id":    rand_id("SUP"),
+            "supplier_name":  names[i % len(names)],
+            "region":         random.choice(REGIONS),
+            "category":       random.choice(CATEGORIES),
+            "lead_time_days": random.randint(2, 21),
+            "active":         True,
+            "onboarded_date": rand_date(date(2018, 1, 1), date(2022, 12, 31)),
+        })
+    return pd.DataFrame(rows)
+
+
+def gen_skus(n: int, suppliers: pd.DataFrame) -> pd.DataFrame:
+    adjectives = ["Heavy", "Precision", "Micro", "Standard", "Premium", "Bulk"]
+    nouns      = ["Bracket", "Seal", "Valve", "Bearing", "Coupling", "Gasket",
+                  "Fastener", "Bushing", "Actuator", "Manifold"]
+    rows = []
+    for _ in range(n):
+        demand_mean = random.randint(50, 500)
+        lead        = random.randint(3, 14)
+        unit_cost   = round(random.uniform(1.5, 250.0), 2)
+        eoq         = int(np.sqrt(2 * demand_mean * 52 * 35 / (0.25 * unit_cost)))
+        safety      = int(1.645 * (demand_mean * 0.2) * np.sqrt(lead / 7))
+        rows.append({
+            "sku_id":       rand_id("SKU"),
+            "description":  f"{random.choice(adjectives)} {random.choice(nouns)}",
+            "category":     random.choice(CATEGORIES),
+            "unit_cost":    unit_cost,
+            "reorder_point": safety + demand_mean,
+            "eoq":          eoq,
+            "safety_stock": safety,
+            "supplier_id":  random.choice(suppliers["supplier_id"].tolist()),
+        })
+    return pd.DataFrame(rows)
+
+
+def gen_orders(n: int, skus: pd.DataFrame, suppliers: pd.DataFrame) -> pd.DataFrame:
+    today = date.today()
+    start = today - timedelta(days=365)
+    rows  = []
+    for _ in range(n):
+        sku      = skus.sample(1).iloc[0]
+        supplier = suppliers[suppliers["supplier_id"] == sku["supplier_id"]].iloc[0]
+        order_dt = rand_date(start, today - timedelta(days=30))
+        lead     = int(supplier["lead_time_days"])
+        exp_dt   = order_dt + timedelta(days=lead)
+        delay    = np.random.choice([0, 0, 0, 1, 2, 3, 5, 7], p=[0.5,0.1,0.1,0.1,0.07,0.06,0.04,0.03])
+        rcv_dt   = exp_dt + timedelta(days=int(delay))
+        qty_ord  = random.randint(10, int(sku["eoq"]) * 2)
+        fill_r   = np.random.choice([1.0, 1.0, 1.0, 0.9, 0.75, 0.5, 0.0],
+                                    p=[0.65, 0.1, 0.05, 0.08, 0.06, 0.04, 0.02])
+        status   = random.choice(STATUSES)
+        rows.append({
+            "order_id":     rand_id("ORD"),
+            "sku_id":       sku["sku_id"],
+            "supplier_id":  sku["supplier_id"],
+            "order_date":   order_dt,
+            "expected_date":exp_dt,
+            "received_date":rcv_dt if status != "cancelled" else None,
+            "qty_ordered":  qty_ord,
+            "qty_received": int(qty_ord * fill_r) if status != "cancelled" else 0,
+            "unit_cost":    sku["unit_cost"],
+            "status":       status,
+        })
+    return pd.DataFrame(rows)
+
+
+def gen_inventory(skus: pd.DataFrame) -> pd.DataFrame:
+    today  = date.today()
+    rows   = []
+    for _, sku in skus.iterrows():
+        on_hand = random.randint(0, int(sku["eoq"]) * 3)
+        for d in range(SNAPSHOT_DAYS):
+            snap_date = today - timedelta(days=SNAPSHOT_DAYS - d)
+            change    = random.randint(-30, 50)
+            on_hand   = max(0, on_hand + change)
+            reserved  = int(on_hand * random.uniform(0, 0.2))
+            rows.append({
+                "snapshot_date": snap_date,
+                "sku_id":        sku["sku_id"],
+                "qty_on_hand":   on_hand,
+                "qty_reserved":  reserved,
+            })
+    return pd.DataFrame(rows)
+
+
+def gen_demand(skus: pd.DataFrame) -> pd.DataFrame:
+    today = date.today()
+    rows  = []
+    for _ in range(N_DEMAND_ROWS):
+        sku        = skus.sample(1).iloc[0]
+        dem_date   = rand_date(today - timedelta(days=90), today)
+        qty_req    = random.randint(1, 200)
+        fill_rate  = random.uniform(0.75, 1.0)
+        rows.append({
+            "demand_date":  dem_date,
+            "sku_id":       sku["sku_id"],
+            "qty_requested":qty_req,
+            "qty_fulfilled":int(qty_req * fill_rate),
+            "channel":      random.choice(["Wholesale", "Retail", "Direct", "Export"]),
+        })
+    return pd.DataFrame(rows)
+
+
+# ──────────────────────────────────────────────
+# ETL: Clean
+# ──────────────────────────────────────────────
+def clean_orders(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply data quality rules to order records."""
+    initial = len(df)
+    # Drop duplicates
+    df = df.drop_duplicates(subset=["order_id"])
+    # Remove rows with no sku or supplier
+    df = df.dropna(subset=["sku_id", "supplier_id"])
+    # Clamp negative quantities
+    df["qty_ordered"]  = df["qty_ordered"].clip(lower=0)
+    df["qty_received"] = df["qty_received"].clip(lower=0)
+    # Ensure received <= ordered
+    df["qty_received"] = df[["qty_ordered", "qty_received"]].min(axis=1)
+    print(f"  Orders cleaned: {initial} → {len(df)} rows ({initial - len(df)} dropped)")
+    return df
+
+
+# ──────────────────────────────────────────────
+# DB Loader
+# ──────────────────────────────────────────────
+def load_to_sqlite(dfs: dict[str, pd.DataFrame], db_path: str) -> None:
+    con = sqlite3.connect(db_path)
+    schema = Path("sql/01_schema.sql").read_text()
+    # Strip the GENERATED ALWAYS column (SQLite compatibility)
+    schema = "\n".join(
+        line for line in schema.splitlines()
+        if "GENERATED ALWAYS" not in line
+    )
+    con.executescript(schema)
+    for table, df in dfs.items():
+        df.to_sql(table, con, if_exists="replace", index=False)
+        print(f"  Loaded {len(df):>6,} rows → {table}")
+    con.close()
+    print(f"\n  Database: {db_path}")
+
+
+# ──────────────────────────────────────────────
+# Main
+# ──────────────────────────────────────────────
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--generate", action="store_true")
+    parser.add_argument("--load",     action="store_true")
+    args = parser.parse_args()
+
+    if not args.generate and not args.load:
+        parser.print_help()
+        return
+
+    DATA_DIR.mkdir(exist_ok=True)
+
+    if args.generate:
+        print("\n── Generating synthetic data ───────────────────")
+        suppliers = gen_suppliers(N_SUPPLIERS)
+        skus      = gen_skus(N_SKUS, suppliers)
+        orders    = clean_orders(gen_orders(N_ORDERS, skus, suppliers))
+        inventory = gen_inventory(skus)
+        demand    = gen_demand(skus)
+
+        suppliers.to_csv(DATA_DIR / "suppliers.csv", index=False)
+        skus.to_csv(DATA_DIR / "skus.csv",           index=False)
+        orders.to_csv(DATA_DIR / "orders.csv",        index=False)
+        inventory.to_csv(DATA_DIR / "inventory.csv",  index=False)
+        demand.to_csv(DATA_DIR / "demand.csv",         index=False)
+        print(f"  Saved 5 CSVs to {DATA_DIR}/")
+
+    if args.load:
+        print("\n── Loading into SQLite ─────────────────────────")
+        dfs = {
+            "suppliers": pd.read_csv(DATA_DIR / "suppliers.csv"),
+            "skus":      pd.read_csv(DATA_DIR / "skus.csv"),
+            "orders":    pd.read_csv(DATA_DIR / "orders.csv"),
+            "inventory": pd.read_csv(DATA_DIR / "inventory.csv"),
+            "demand":    pd.read_csv(DATA_DIR / "demand.csv"),
+        }
+        load_to_sqlite(dfs, DB_PATH)
+
+    print("\n✓ ETL complete.\n")
+
+
+if __name__ == "__main__":
+    main()
