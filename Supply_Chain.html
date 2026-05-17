@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supply Chain Analytics Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0D0F0E;
+    --surface: #161A18;
+    --card: #1C211F;
+    --border: #2A3330;
+    --accent: #1D9E75;
+    --accent-dim: #0F6E56;
+    --accent-glow: rgba(29,158,117,0.12);
+    --amber: #EF9F27;
+    --coral: #D85A30;
+    --blue: #378ADD;
+    --purple: #7F77DD;
+    --text: #E8EDE9;
+    --muted: #8A9E95;
+    --dim: #4A5E57;
+    --mono: 'IBM Plex Mono', monospace;
+    --serif: 'DM Serif Display', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Grid lines ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 64px 0 48px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 56px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+    background: var(--accent-glow);
+    padding: 4px 12px;
+    border-radius: 2px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(36px, 6vw, 60px);
+    font-weight: 400;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  h1 em {
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .subtitle {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 560px;
+    line-height: 1.7;
+    margin-bottom: 32px;
+  }
+
+  .stack-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .pill {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .pill.py   { border-color: #4B8BBE44; color: #4B8BBE; background: #4B8BBE11; }
+  .pill.sql  { border-color: var(--amber); color: var(--amber); background: #EF9F2711; opacity:0.85; }
+  .pill.np   { border-color: var(--purple); color: var(--purple); background: #7F77DD11; }
+  .pill.sp   { border-color: var(--blue); color: var(--blue); background: #378ADD11; }
+  .pill.mpl  { border-color: var(--coral); color: var(--coral); background: #D85A3011; }
+
+  /* ── KPI strip ── */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 56px;
+  }
+
+  .kpi-cell {
+    background: var(--surface);
+    padding: 20px 24px;
+    position: relative;
+    transition: background 0.2s;
+  }
+
+  .kpi-cell:hover { background: var(--card); }
+
+  .kpi-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .kpi-value span {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .kpi-delta {
+    font-size: 11px;
+    margin-top: 6px;
+    color: var(--accent);
+  }
+
+  .kpi-delta.neg { color: var(--coral); }
+
+  /* ── Section ── */
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Module cards ── */
+  .modules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 56px;
+  }
+
+  .module-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.15s;
+    cursor: default;
+  }
+
+  .module-card:hover {
+    border-color: var(--accent-dim);
+    transform: translateY(-2px);
+  }
+
+  .module-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .module-card.m1::before { background: var(--accent); }
+  .module-card.m2::before { background: var(--amber); }
+  .module-card.m3::before { background: var(--purple); }
+
+  .module-num {
+    font-size: 11px;
+    color: var(--dim);
+    margin-bottom: 12px;
+  }
+
+  .module-title {
+    font-family: var(--serif);
+    font-size: 20px;
+    color: var(--text);
+    margin-bottom: 10px;
+    line-height: 1.2;
+  }
+
+  .module-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .module-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    color: var(--dim);
+  }
+
+  /* ── SQL showcase ── */
+  .sql-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 56px;
+    overflow: hidden;
+  }
+
+  .sql-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+
+  .sql-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  .sql-filename {
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+    text-align: center;
+  }
+
+  .sql-body {
+    padding: 24px;
+    overflow-x: auto;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre;
+    color: var(--text);
+  }
+
+  .k  { color: #7F77DD; }  /* keywords */
+  .fn { color: #1D9E75; }  /* functions */
+  .cm { color: #4A5E57; font-style: italic; } /* comments */
+  .st { color: #EF9F27; }  /* strings / dates */
+  .nm { color: #378ADD; }  /* numbers */
+
+  /* ── Supplier scorecard ── */
+  .scorecard {
+    margin-bottom: 56px;
+  }
+
+  .score-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .score-name { font-size: 13px; color: var(--text); }
+  .score-bar-wrap { width: 180px; position: relative; }
+
+  .score-bar-bg {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s ease;
+  }
+
+  .score-tier {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    min-width: 70px;
+    text-align: center;
+  }
+
+  .tier-pref  { background: #1D9E7520; color: var(--accent); border: 1px solid var(--accent-dim); }
+  .tier-appr  { background: #378ADD20; color: var(--blue);   border: 1px solid #185FA5; }
+  .tier-watch { background: #EF9F2720; color: var(--amber);  border: 1px solid #BA7517; }
+  .tier-risk  { background: #D85A3020; color: var(--coral);  border: 1px solid #993C1D; }
+
+  /* ── Output terminal ── */
+  .terminal {
+    background: #080A09;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 56px;
+    overflow: hidden;
+  }
+
+  .term-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .term-body {
+    padding: 20px 24px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #8A9E95;
+  }
+
+  .term-body .g { color: var(--accent); }
+  .term-body .w { color: var(--amber); }
+  .term-body .b { color: var(--blue); }
+  .term-body .dim { color: var(--dim); }
+  .term-body .hi { color: var(--text); font-weight: 500; }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .footer-text { font-size: 12px; color: var(--dim); }
+
+  .gh-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    border: 1px solid var(--accent-dim);
+    padding: 8px 16px;
+    border-radius: 2px;
+    background: var(--accent-glow);
+    transition: background 0.2s;
+  }
+
+  .gh-link:hover { background: rgba(29,158,117,0.2); }
+
+  .gh-link svg { width: 16px; height: 16px; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .wrap > * { animation: fadeUp 0.5s ease both; }
+  header     { animation-delay: 0.05s; }
+  .kpi-strip { animation-delay: 0.15s; }
+  .modules   { animation-delay: 0.22s; }
+  .sql-block { animation-delay: 0.28s; }
+  .scorecard { animation-delay: 0.34s; }
+  .terminal  { animation-delay: 0.40s; }
+  footer     { animation-delay: 0.46s; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="badge">📦 GitHub Portfolio Project</div>
+    <h1>Supply Chain<br><em>Analytics</em> System</h1>
+    <p class="subtitle">
+      End-to-end analytics pipeline for supply chain performance — from raw transactional data to KPI dashboards, supplier scorecards, and inventory optimization models.
+    </p>
+    <div class="stack-pills">
+      <span class="pill py">Python 3.11</span>
+      <span class="pill sql">SQL / SQLite</span>
+      <span class="pill np">NumPy &amp; Pandas</span>
+      <span class="pill sp">SciPy</span>
+      <span class="pill mpl">Matplotlib</span>
+    </div>
+  </header>
+
+  <!-- KPI Strip -->
+  <div class="kpi-strip">
+    <div class="kpi-cell">
+      <div class="kpi-label">OTIF Rate</div>
+      <div class="kpi-value">87.4<span>%</span></div>
+      <div class="kpi-delta">▲ +2.1% vs Q2</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label">Fill Rate</div>
+      <div class="kpi-value">94.2<span>%</span></div>
+      <div class="kpi-delta">▲ +0.8% vs Q2</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label">Stockout Rate</div>
+      <div class="kpi-value">3.1<span>%</span></div>
+      <div class="kpi-delta">▼ −1.4% vs Q2</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label">Avg Cycle Time</div>
+      <div class="kpi-value">4.7<span> days</span></div>
+      <div class="kpi-delta">▼ −0.3d vs Q2</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label">Active SKUs</div>
+      <div class="kpi-value">248</div>
+      <div class="kpi-delta">19 at-risk</div>
+    </div>
+  </div>
+
+  <!-- Modules -->
+  <div class="section-label">Project Modules</div>
+  <div class="modules">
+    <div class="module-card m1">
+      <div class="module-num">01 /</div>
+      <div class="module-title">ETL Pipeline</div>
+      <div class="module-desc">
+        Ingests supplier, order, inventory, and demand data. Applies cleaning rules — deduplication, quantity clamping, null-fill strategies — before loading into SQLite.
+      </div>
+      <div class="module-tags">
+        <span class="tag">etl_pipeline.py</span>
+        <span class="tag">01_schema.sql</span>
+        <span class="tag">Pandas</span>
+        <span class="tag">SQLite</span>
+      </div>
+    </div>
+
+    <div class="module-card m2">
+      <div class="module-num">02 /</div>
+      <div class="module-title">KPI Engine</div>
+      <div class="module-desc">
+        Computes OTIF, fill rate, stockout rate, cycle time, and at-risk SKUs. Generates supplier scorecards with composite scoring across 5 weighted dimensions.
+      </div>
+      <div class="module-tags">
+        <span class="tag">kpi_engine.py</span>
+        <span class="tag">02_kpi_queries.sql</span>
+        <span class="tag">03_supplier_scorecard.sql</span>
+      </div>
+    </div>
+
+    <div class="module-card m3">
+      <div class="module-num">03 /</div>
+      <div class="module-title">Inventory Optimizer</div>
+      <div class="module-desc">
+        Exponential smoothing demand forecasting, EOQ calculation, and safety stock optimization using z-score methodology at 95% service level.
+      </div>
+      <div class="module-tags">
+        <span class="tag">inventory_optimizer.py</span>
+        <span class="tag">SciPy</span>
+        <span class="tag">EOQ Model</span>
+        <span class="tag">Safety Stock</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SQL Showcase -->
+  <div class="section-label">SQL Showcase — OTIF Calculation</div>
+  <div class="sql-block">
+    <div class="sql-header">
+      <div class="sql-dot" style="background:#E24B4A"></div>
+      <div class="sql-dot" style="background:#EF9F27"></div>
+      <div class="sql-dot" style="background:#1D9E75"></div>
+      <div class="sql-filename">02_kpi_queries.sql</div>
+    </div>
+    <div class="sql-body">
+<pre><span class="cm">-- OTIF Rate: On-Time In-Full delivery performance</span>
+<span class="cm">-- On-time  = received_date &lt;= expected_date</span>
+<span class="cm">-- In-full  = qty_received  >= qty_ordered</span>
+
+<span class="k">WITH</span> otif_base <span class="k">AS</span> (
+    <span class="k">SELECT</span>
+        order_id,
+        <span class="k">CASE WHEN</span> received_date <span class="k">&lt;=</span> expected_date
+             <span class="k">THEN</span> <span class="nm">1</span> <span class="k">ELSE</span> <span class="nm">0</span> <span class="k">END AS</span> on_time,
+        <span class="k">CASE WHEN</span> qty_received <span class="k">&gt;=</span> qty_ordered
+             <span class="k">THEN</span> <span class="nm">1</span> <span class="k">ELSE</span> <span class="nm">0</span> <span class="k">END AS</span> in_full
+    <span class="k">FROM</span>  orders
+    <span class="k">WHERE</span> status     <span class="k">=</span> <span class="st">'received'</span>
+      <span class="k">AND</span>  order_date <span class="k">&gt;=</span> <span class="fn">DATE</span>(<span class="st">'now'</span>, <span class="st">'-90 days'</span>)
+)
+<span class="k">SELECT</span>
+    <span class="fn">COUNT</span>(*)                                    <span class="k">AS</span> total_orders,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(on_time)           <span class="k">*</span> <span class="nm">100</span>, <span class="nm">1</span>)   <span class="k">AS</span> on_time_pct,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(in_full)           <span class="k">*</span> <span class="nm">100</span>, <span class="nm">1</span>)   <span class="k">AS</span> in_full_pct,
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(on_time <span class="k">*</span> in_full) <span class="k">*</span> <span class="nm">100</span>, <span class="nm">1</span>)   <span class="k">AS</span> otif_rate
+<span class="k">FROM</span> otif_base;</pre>
+    </div>
+  </div>
+
+  <!-- Supplier Scorecard -->
+  <div class="section-label">Supplier Scorecard (simulated output)</div>
+  <div class="scorecard">
+    <div id="scorecards"></div>
+  </div>
+
+  <!-- Terminal Output -->
+  <div class="section-label">CLI Output — kpi_engine.py</div>
+  <div class="terminal">
+    <div class="term-header">
+      <div class="term-dot" style="background:#E24B4A"></div>
+      <div class="term-dot" style="background:#EF9F27"></div>
+      <div class="term-dot" style="background:#1D9E75"></div>
+    </div>
+    <div class="term-body">
+      <div><span class="dim">$</span> python analysis/kpi_engine.py</div>
+      <div>&nbsp;</div>
+      <div class="dim">Running KPI engine...</div>
+      <div>&nbsp;</div>
+      <div class="dim">════════════════════════════════════════════════════════════</div>
+      <div class="hi">  SUPPLY CHAIN KPI REPORT</div>
+      <div class="dim">════════════════════════════════════════════════════════════</div>
+      <div>  OTIF Rate:          <span class="g">87.4%</span></div>
+      <div>  On-Time Rate:       <span class="g">91.2%</span></div>
+      <div>  In-Full Rate:       <span class="g">95.8%</span></div>
+      <div>  Fill Rate (avg):    <span class="g">94.2%</span></div>
+      <div>  Stockout Rate:      <span class="w"> 3.1%</span></div>
+      <div>  Avg Cycle Time:     <span class="b"> 4.7 days</span></div>
+      <div>  Orders Analyzed:    <span class="hi">2,841</span></div>
+      <div class="dim">────────────────────────────────────────────────────────────</div>
+      <div>  At-Risk SKUs:       <span class="w">19</span></div>
+      <div>  Stockouts:          <span class="w"> 3</span></div>
+      <div class="dim">────────────────────────────────────────────────────────────</div>
+      <div>  Top Supplier:  <span class="g">Apex Industrial         </span>  Score: <span class="g">91</span>/100</div>
+      <div>  Needs Work:    <span class="w">Global Parts Co.        </span>  Score: <span class="w">58</span>/100</div>
+      <div class="dim">════════════════════════════════════════════════════════════</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-text">Supply Chain Analyst Portfolio · Python &amp; SQL · 2024</div>
+    <a href="https://github.com" class="gh-link">
+      <svg viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      View on GitHub
+    </a>
+  </footer>
+
+</div>
+
+<script>
+const suppliers = [
+  { name: "Apex Industrial",     score: 91, tier: "Preferred" },
+  { name: "BlueSky Components",  score: 88, tier: "Preferred" },
+  { name: "CoreLink MFG",        score: 84, tier: "Approved"  },
+  { name: "Delta Supplies",      score: 79, tier: "Approved"  },
+  { name: "Everest Parts",       score: 73, tier: "Approved"  },
+  { name: "Frontier Logistics",  score: 68, tier: "Watch"     },
+  { name: "Global Parts Co.",    score: 58, tier: "At Risk"   },
+];
+
+const tierClass = {
+  "Preferred": "tier-pref",
+  "Approved":  "tier-appr",
+  "Watch":     "tier-watch",
+  "At Risk":   "tier-risk",
+};
+
+const barColor = {
+  "Preferred": "#1D9E75",
+  "Approved":  "#378ADD",
+  "Watch":     "#EF9F27",
+  "At Risk":   "#D85A30",
+};
+
+const container = document.getElementById("scorecards");
+suppliers.forEach(s => {
+  const row = document.createElement("div");
+  row.className = "score-row";
+  row.innerHTML = `
+    <div class="score-name">${s.name}</div>
+    <div class="score-bar-wrap">
+      <div class="score-bar-bg">
+        <div class="score-bar-fill" style="width:0%; background:${barColor[s.tier]}" data-w="${s.score}"></div>
+      </div>
+    </div>
+    <div class="score-tier ${tierClass[s.tier]}">${s.tier}</div>
+  `;
+  container.appendChild(row);
+});
+
+// Animate bars after paint
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".score-bar-fill").forEach(el => {
+      el.style.width = el.dataset.w + "%";
+    });
+  });
+});
+</script>
+</body>
+</html>
